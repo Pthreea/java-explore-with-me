@@ -179,7 +179,7 @@ public class PublicEventServiceImpl implements PublicEventService {
         }
 
         LocalDateTime start = events.stream()
-                .map(Event::getCreatedOn)
+                .map(e -> e.getPublishedOn() != null ? e.getPublishedOn() : e.getCreatedOn())
                 .min(LocalDateTime::compareTo)
                 .orElse(LocalDateTime.now().minusYears(1));
 
@@ -188,7 +188,7 @@ public class PublicEventServiceImpl implements PublicEventService {
                 .collect(Collectors.toList());
 
         try {
-            List<ViewStatsDto> stats = statsClient.getStats(start, LocalDateTime.now(), uris, false);
+            List<ViewStatsDto> stats = statsClient.getStats(start, LocalDateTime.now(), uris, true); // unique=true
 
             return stats.stream()
                     .collect(Collectors.toMap(
@@ -203,19 +203,17 @@ public class PublicEventServiceImpl implements PublicEventService {
 
     private Long getViews(Event event) {
         try {
-            LocalDateTime start = event.getCreatedOn();
+            LocalDateTime start = event.getPublishedOn() != null
+                    ? event.getPublishedOn()
+                    : event.getCreatedOn();
+
             LocalDateTime end = LocalDateTime.now();
             String uri = "/events/" + event.getId();
 
             log.info("Fetching views for event {}: start={}, end={}, uri={}",
                     event.getId(), start, end, uri);
 
-            List<ViewStatsDto> stats = statsClient.getStats(
-                    start,
-                    end,
-                    List.of(uri),
-                    false
-            );
+            List<ViewStatsDto> stats = statsClient.getStats(start, end, List.of(uri), true); // unique=true
 
             Long views = stats.isEmpty() ? 0L : stats.get(0).getHits();
             log.info("Views for event {}: {}", event.getId(), views);
