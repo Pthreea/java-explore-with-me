@@ -9,9 +9,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.practicum.client.StatsClient;
-import ru.practicum.dto.EndpointHitDto;
-import ru.practicum.dto.ViewStatsDto;
 import ru.practicum.ewm.exception.NotFoundException;
 import ru.practicum.ewm.exception.ValidationException;
 import ru.practicum.ewm.model.Event;
@@ -22,7 +19,9 @@ import ru.practicum.ewm.pub.dto.EventShortDto;
 import ru.practicum.ewm.repository.EventRepository;
 import ru.practicum.ewm.repository.RequestRepository;
 import ru.practicum.ewm.util.EventMapper;
-
+import ru.practicum.client.StatsClient;
+import ru.practicum.dto.EndpointHitDto;
+import ru.practicum.dto.ViewStatsDto;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -53,53 +52,51 @@ public class PublicEventServiceImpl implements PublicEventService {
                                             int size,
                                             HttpServletRequest request) {
 
-        log.info("Public search events: text={}, categories={}, paid={}, rangeStart={}, rangeEnd={}, onlyAvailable={}, sort={}",
-                text, categories, paid, rangeStart, rangeEnd, onlyAvailable, sort);
+        log.info("Public search events: text={}, categories={}, paid={}, from={}, size={}",
+                text, categories, paid, from, size);
 
-        // Сохраняем статистику обращения
-        saveStats(request);
+        try {
+            saveStats(request);
 
-        // Валидация диапазона дат
-        if (rangeStart != null && rangeEnd != null && rangeStart.isAfter(rangeEnd)) {
-            throw new ValidationException("Start date must be before end date");
+            if (rangeStart != null && rangeEnd != null && rangeStart.isAfter(rangeEnd)) {
+                throw new ValidationException("Start date must be before end date");
+            }
+
+            LocalDateTime start = rangeStart != null ? rangeStart : LocalDateTime.now();
+            Pageable pageable = createPageable(from, size, sort);
+
+            List<Event> events = eventRepository.findPublicEvents(
+                    text, categories, paid, start, rangeEnd, pageable
+            ).getContent();
+
+            if (Boolean.TRUE.equals(onlyAvailable)) {
+                events = filterAvailableEvents(events);
+            }
+
+            Map<Long, Long> viewsMap = getViewsMap(events);
+
+            List<EventShortDto> result = events.stream()
+                    .map(event -> {
+                        Long confirmedRequests = requestRepository.countByEventIdAndStatus(
+                                event.getId(), RequestStatus.CONFIRMED);
+                        Long views = viewsMap.getOrDefault(event.getId(), 0L);
+                        return EventMapper.toEventShortDto(event, confirmedRequests, views);
+                    })
+                    .collect(Collectors.toList());
+
+            if ("VIEWS".equalsIgnoreCase(sort)) {
+                result.sort(Comparator.comparing(EventShortDto::getViews).reversed());
+            }
+
+            log.info("Found {} events", result.size());
+            return result;
+
+        } catch (ValidationException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Error searching events", e);
+            throw new RuntimeException("Failed to search events", e);
         }
-
-        // Если диапазон не указан, берём от текущего момента
-        LocalDateTime start = rangeStart != null ? rangeStart : LocalDateTime.now();
-
-        // Определяем сортировку
-        Pageable pageable = createPageable(from, size, sort);
-
-        // Поиск событий
-        List<Event> events = eventRepository.findPublicEvents(
-                text, categories, paid, start, rangeEnd, pageable
-        ).getContent();
-
-        // Фильтрация по доступности мест
-        if (Boolean.TRUE.equals(onlyAvailable)) {
-            events = filterAvailableEvents(events);
-        }
-
-        // Получаем статистику просмотров
-        Map<Long, Long> viewsMap = getViewsMap(events);
-
-        // Формируем результат
-        List<EventShortDto> result = events.stream()
-                .map(event -> {
-                    Long confirmedRequests = requestRepository.countByEventIdAndStatus(
-                            event.getId(), RequestStatus.CONFIRMED);
-                    Long views = viewsMap.getOrDefault(event.getId(), 0L);
-                    return EventMapper.toEventShortDto(event, confirmedRequests, views);
-                })
-                .collect(Collectors.toList());
-
-        // Дополнительная сортировка по просмотрам если нужно
-        if ("VIEWS".equalsIgnoreCase(sort)) {
-            result.sort(Comparator.comparing(EventShortDto::getViews).reversed());
-        }
-
-        log.info("Found {} events", result.size());
-        return result;
     }
 
     @Override
@@ -110,13 +107,9 @@ public class PublicEventServiceImpl implements PublicEventService {
         Event event = eventRepository.findByIdAndState(id, EventState.PUBLISHED)
                 .orElseThrow(() -> new NotFoundException("Event with id=" + id + " was not found"));
 
-        // Сохраняем статистику просмотра
         saveStats(request);
 
-        // Получаем количество подтверждённых заявок
         Long confirmedRequests = requestRepository.countByEventIdAndStatus(id, RequestStatus.CONFIRMED);
-
-        // Получаем количество просмотров
         Long views = getViews(event);
 
         return EventMapper.toEventFullDto(event, confirmedRequests, views);
@@ -126,7 +119,6 @@ public class PublicEventServiceImpl implements PublicEventService {
         if ("EVENT_DATE".equalsIgnoreCase(sort)) {
             return PageRequest.of(from / size, size, Sort.by("eventDate").ascending());
         }
-        // По умолчанию сортировка по ID
         return PageRequest.of(from / size, size);
     }
 
@@ -134,7 +126,7 @@ public class PublicEventServiceImpl implements PublicEventService {
         return events.stream()
                 .filter(event -> {
                     if (event.getParticipantLimit() == 0) {
-                        return true; // Нет лимита
+                        return true;
                     }
                     Long confirmedCount = requestRepository.countByEventIdAndStatus(
                             event.getId(), RequestStatus.CONFIRMED);
@@ -145,18 +137,34 @@ public class PublicEventServiceImpl implements PublicEventService {
 
     private void saveStats(HttpServletRequest request) {
         try {
+            String clientIp = getClientIp(request);
+
             EndpointHitDto hitDto = EndpointHitDto.builder()
                     .app(appName)
                     .uri(request.getRequestURI())
-                    .ip(request.getRemoteAddr())
+                    .ip(clientIp)
                     .timestamp(LocalDateTime.now())
                     .build();
 
             statsClient.saveHit(hitDto);
-            log.debug("Stats saved: uri={}, ip={}", request.getRequestURI(), request.getRemoteAddr());
+            log.debug("Stats saved: uri={}, ip={}", request.getRequestURI(), clientIp);
         } catch (Exception e) {
             log.error("Failed to save stats", e);
         }
+    }
+
+    private String getClientIp(HttpServletRequest request) {
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
+            return xForwardedFor.split(",")[0].trim();
+        }
+
+        String xRealIp = request.getHeader("X-Real-IP");
+        if (xRealIp != null && !xRealIp.isEmpty()) {
+            return xRealIp;
+        }
+
+        return request.getRemoteAddr();
     }
 
     private Map<Long, Long> getViewsMap(List<Event> events) {
@@ -174,12 +182,7 @@ public class PublicEventServiceImpl implements PublicEventService {
                     .min(LocalDateTime::compareTo)
                     .orElse(LocalDateTime.now().minusYears(100));
 
-            List<ViewStatsDto> stats = statsClient.getStats(
-                    start,
-                    LocalDateTime.now(),
-                    uris,
-                    true
-            );
+            List<ViewStatsDto> stats = statsClient.getStats(start, LocalDateTime.now(), uris, true);
 
             return stats.stream()
                     .collect(Collectors.toMap(
@@ -210,7 +213,6 @@ public class PublicEventServiceImpl implements PublicEventService {
     }
 
     private Long extractEventId(String uri) {
-        // Извлекаем ID события из URI вида "/events/123"
         String[] parts = uri.split("/");
         return Long.parseLong(parts[parts.length - 1]);
     }
