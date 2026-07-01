@@ -178,42 +178,51 @@ public class PublicEventServiceImpl implements PublicEventService {
             return Collections.emptyMap();
         }
 
+        LocalDateTime start = events.stream()
+                .map(Event::getCreatedOn)
+                .min(LocalDateTime::compareTo)
+                .orElse(LocalDateTime.now().minusYears(1));
+
+        List<String> uris = events.stream()
+                .map(e -> "/events/" + e.getId())
+                .collect(Collectors.toList());
+
         try {
-            List<String> uris = events.stream()
-                    .map(event -> "/events/" + event.getId())
-                    .collect(Collectors.toList());
-
-            LocalDateTime start = events.stream()
-                    .map(Event::getCreatedOn)
-                    .min(LocalDateTime::compareTo)
-                    .orElse(LocalDateTime.now().minusYears(100));
-
             List<ViewStatsDto> stats = statsClient.getStats(start, LocalDateTime.now(), uris, false);
 
             return stats.stream()
                     .collect(Collectors.toMap(
-                            stat -> extractEventId(stat.getUri()),
-                            ViewStatsDto::getHits,
-                            (a, b) -> a
+                            stat -> Long.parseLong(stat.getUri().substring("/events/".length())),
+                            ViewStatsDto::getHits
                     ));
         } catch (Exception e) {
-            log.error("Failed to get views stats", e);
+            log.error("Failed to get views map: {}", e.getMessage());
             return Collections.emptyMap();
         }
     }
 
     private Long getViews(Event event) {
         try {
+            LocalDateTime start = event.getCreatedOn();
+            LocalDateTime end = LocalDateTime.now();
+            String uri = "/events/" + event.getId();
+
+            log.info("Fetching views for event {}: start={}, end={}, uri={}",
+                    event.getId(), start, end, uri);
+
             List<ViewStatsDto> stats = statsClient.getStats(
-                    event.getCreatedOn(),
-                    LocalDateTime.now(),
-                    List.of("/events/" + event.getId()),
+                    start,
+                    end,
+                    List.of(uri),
                     false
             );
 
-            return stats.isEmpty() ? 0L : stats.get(0).getHits();
+            Long views = stats.isEmpty() ? 0L : stats.get(0).getHits();
+            log.info("Views for event {}: {}", event.getId(), views);
+
+            return views;
         } catch (Exception e) {
-            log.error("Failed to get views for event {}", event.getId(), e);
+            log.error("Failed to get views for event {}: {}", event.getId(), e.getMessage());
             return 0L;
         }
     }

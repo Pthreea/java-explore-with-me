@@ -1,5 +1,7 @@
 package ru.practicum.client;
 
+import java.util.Arrays;
+import java.util.Collections;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
@@ -9,12 +11,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.DefaultUriBuilderFactory;
-import org.springframework.web.util.UriComponentsBuilder;
 import ru.practicum.dto.EndpointHitDto;
 import ru.practicum.dto.ViewStatsDto;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -43,40 +42,50 @@ public class StatsClient {
         }
     }
 
-    public List<ViewStatsDto> getStats(LocalDateTime start, LocalDateTime end, List<String> uris, boolean unique) {
-        try {
-            String encodedStart = encodeDateTime(start);
-            String encodedEnd = encodeDateTime(end);
+    public List<ViewStatsDto> getStats(LocalDateTime start, LocalDateTime end, List<String> uris, Boolean unique) {
+        String startStr = start.format(FORMATTER);
+        String endStr = end.format(FORMATTER);
 
-            UriComponentsBuilder builder = UriComponentsBuilder.fromPath("/stats")
-                    .queryParam("start", encodedStart)
-                    .queryParam("end", encodedEnd)
-                    .queryParam("unique", unique);
+        String url = "/stats?start={start}&end={end}&unique={unique}";
 
-            if (uris != null && !uris.isEmpty()) {
-                builder.queryParam("uris", String.join(",", uris));
+        if (uris != null && !uris.isEmpty()) {
+            String urisParam = String.join(",", uris);
+            url += "&uris={uris}";
+
+            try {
+                ResponseEntity<ViewStatsDto[]> response = restTemplate.exchange(
+                        url,
+                        HttpMethod.GET,
+                        null,
+                        ViewStatsDto[].class,
+                        startStr,
+                        endStr,
+                        unique,
+                        urisParam
+                );
+
+                return response.getBody() != null ? Arrays.asList(response.getBody()) : Collections.emptyList();
+            } catch (Exception e) {
+                log.error("Error retrieving stats: {}", e.getMessage());
+                throw new RuntimeException("Failed to retrieve stats", e);
             }
+        }
 
-            String uri = builder.toUriString();
-
+        try {
             ResponseEntity<ViewStatsDto[]> response = restTemplate.exchange(
-                    uri,
+                    url,
                     HttpMethod.GET,
                     null,
-                    ViewStatsDto[].class
+                    ViewStatsDto[].class,
+                    startStr,
+                    endStr,
+                    unique
             );
 
-            ViewStatsDto[] stats = response.getBody();
-            log.info("Retrieved stats: {} records", stats != null ? stats.length : 0);
-            return stats != null ? List.of(stats) : List.of();
+            return response.getBody() != null ? Arrays.asList(response.getBody()) : Collections.emptyList();
         } catch (Exception e) {
             log.error("Error retrieving stats: {}", e.getMessage());
             throw new RuntimeException("Failed to retrieve stats", e);
         }
-    }
-
-    private String encodeDateTime(LocalDateTime dateTime) {
-        String formatted = dateTime.format(FORMATTER);
-        return URLEncoder.encode(formatted, StandardCharsets.UTF_8);
     }
 }
