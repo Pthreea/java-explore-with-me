@@ -14,9 +14,11 @@ import java.util.Optional;
 
 public interface EventRepository extends JpaRepository<Event, Long> {
 
-    Page<Event> findByInitiatorId(Long initiatorId, Pageable pageable);
+    Page<Event> findByInitiatorId(Long userId, Pageable pageable);
 
-    Optional<Event> findByIdAndInitiatorId(Long id, Long initiatorId);
+    Optional<Event> findByIdAndInitiatorId(Long id, Long userId);
+
+    Optional<Event> findByIdAndState(Long id, EventState state);
 
     @Query("SELECT e FROM Event e " +
             "WHERE (:users IS NULL OR e.initiator.id IN :users) " +
@@ -24,30 +26,26 @@ public interface EventRepository extends JpaRepository<Event, Long> {
             "AND (:categories IS NULL OR e.category.id IN :categories) " +
             "AND (CAST(:rangeStart AS timestamp) IS NULL OR e.eventDate >= :rangeStart) " +
             "AND (CAST(:rangeEnd AS timestamp) IS NULL OR e.eventDate <= :rangeEnd)")
-    Page<Event> findEventsByAdmin(
-            @Param("users") List<Long> users,
-            @Param("states") List<EventState> states,
-            @Param("categories") List<Long> categories,
-            @Param("rangeStart") LocalDateTime rangeStart,
-            @Param("rangeEnd") LocalDateTime rangeEnd,
-            Pageable pageable
-    );
+    Page<Event> findAdminEvents(@Param("users") List<Long> users,
+                                @Param("states") List<EventState> states,
+                                @Param("categories") List<Long> categories,
+                                @Param("rangeStart") LocalDateTime rangeStart,
+                                @Param("rangeEnd") LocalDateTime rangeEnd,
+                                Pageable pageable);
 
     @Query("SELECT e FROM Event e " +
-            "WHERE e.state = ru.practicum.ewm.model.EventState.PUBLISHED " +
-            "AND (:text IS NULL OR :text = '' OR " +
+            "WHERE e.state = 'PUBLISHED' " +
+            "AND (:text IS NULL OR " +
             "     LOWER(e.annotation) LIKE LOWER(CONCAT('%', :text, '%')) OR " +
             "     LOWER(e.description) LIKE LOWER(CONCAT('%', :text, '%'))) " +
-            "AND (:categories IS NULL OR SIZE(:categories) = 0 OR e.category.id IN :categories) " +
+            "AND (:categories IS NULL OR e.category.id IN :categories) " +
             "AND (:paid IS NULL OR e.paid = :paid) " +
             "AND e.eventDate >= :rangeStart " +
-            "AND (:rangeEnd IS NULL OR e.eventDate <= :rangeEnd)")
+            "AND (CAST(:rangeEnd AS timestamp) IS NULL OR e.eventDate <= :rangeEnd)")
     Page<Event> findPublicEvents(@Param("text") String text,
                                  @Param("categories") List<Long> categories,
                                  @Param("paid") Boolean paid,
                                  @Param("rangeStart") LocalDateTime rangeStart,
                                  @Param("rangeEnd") LocalDateTime rangeEnd,
                                  Pageable pageable);
-
-    Optional<Event> findByIdAndState(Long id, EventState state);
 }

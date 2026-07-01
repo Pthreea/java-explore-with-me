@@ -63,14 +63,18 @@ public class PublicEventServiceImpl implements PublicEventService {
             }
 
             LocalDateTime start = rangeStart != null ? rangeStart : LocalDateTime.now();
-
-            List<Long> categoriesForQuery = (categories != null && categories.isEmpty()) ? null : categories;
-
             Pageable pageable = createPageable(from, size, sort);
 
+            List<Long> cats = (categories != null && !categories.isEmpty()) ? categories : null;
+
+            log.info("Executing query with: text={}, categories={}, paid={}, start={}, end={}",
+                    text, cats, paid, start, rangeEnd);
+
             List<Event> events = eventRepository.findPublicEvents(
-                    text, categoriesForQuery, paid, start, rangeEnd, pageable
+                    text, cats, paid, start, rangeEnd, pageable
             ).getContent();
+
+            log.info("Found {} events", events.size());
 
             if (Boolean.TRUE.equals(onlyAvailable)) {
                 events = filterAvailableEvents(events);
@@ -91,14 +95,13 @@ public class PublicEventServiceImpl implements PublicEventService {
                 result.sort(Comparator.comparing(EventShortDto::getViews).reversed());
             }
 
-            log.info("Found {} events", result.size());
             return result;
 
         } catch (ValidationException e) {
             throw e;
         } catch (Exception e) {
             log.error("Error searching events", e);
-            throw new RuntimeException("Failed to search events", e);
+            throw new RuntimeException("Failed to search events: " + e.getMessage(), e);
         }
     }
 

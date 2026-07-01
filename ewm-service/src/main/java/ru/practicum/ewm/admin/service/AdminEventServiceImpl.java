@@ -47,7 +47,7 @@ public class AdminEventServiceImpl implements AdminEventService {
 
         Pageable pageable = PageRequest.of(from / size, size);
 
-        List<Event> events = eventRepository.findEventsByAdmin(
+        List<Event> events = eventRepository.findAdminEvents(
                 users, eventStates, categories, rangeStart, rangeEnd, pageable
         ).getContent();
 
@@ -70,7 +70,6 @@ public class AdminEventServiceImpl implements AdminEventService {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
 
-        // Валидация даты публикации
         if (request.getEventDate() != null) {
             LocalDateTime minPublishDate = LocalDateTime.now().plusHours(1);
             if (request.getEventDate().isBefore(minPublishDate)) {
@@ -78,7 +77,6 @@ public class AdminEventServiceImpl implements AdminEventService {
             }
         }
 
-        // Обработка состояния
         if (request.getStateAction() != null) {
             AdminStateAction action = AdminStateAction.valueOf(request.getStateAction());
 
@@ -101,7 +99,6 @@ public class AdminEventServiceImpl implements AdminEventService {
             }
         }
 
-        // Обновление полей
         updateEventFields(event, request);
 
         Event updatedEvent = eventRepository.save(event);
