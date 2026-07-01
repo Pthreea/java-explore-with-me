@@ -188,7 +188,7 @@ public class PublicEventServiceImpl implements PublicEventService {
                     .min(LocalDateTime::compareTo)
                     .orElse(LocalDateTime.now().minusYears(100));
 
-            List<ViewStatsDto> stats = statsClient.getStats(start, LocalDateTime.now(), uris, true);
+            List<ViewStatsDto> stats = statsClient.getStats(start, LocalDateTime.now(), uris, false);
 
             return stats.stream()
                     .collect(Collectors.toMap(
@@ -208,7 +208,7 @@ public class PublicEventServiceImpl implements PublicEventService {
                     event.getCreatedOn(),
                     LocalDateTime.now(),
                     List.of("/events/" + event.getId()),
-                    true
+                    false
             );
 
             return stats.isEmpty() ? 0L : stats.get(0).getHits();
