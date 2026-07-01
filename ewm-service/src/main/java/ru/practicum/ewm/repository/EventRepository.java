@@ -34,21 +34,20 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     );
 
     @Query("SELECT e FROM Event e " +
-            "WHERE e.state = 'PUBLISHED' " +
-            "AND (:text IS NULL OR LOWER(e.annotation) LIKE LOWER(CONCAT('%', :text, '%')) " +
-            "    OR LOWER(e.description) LIKE LOWER(CONCAT('%', :text, '%'))) " +
-            "AND (:categories IS NULL OR e.category.id IN :categories) " +
+            "WHERE e.state = ru.practicum.ewm.model.EventState.PUBLISHED " +
+            "AND (:text IS NULL OR :text = '' OR " +
+            "     LOWER(e.annotation) LIKE LOWER(CONCAT('%', :text, '%')) OR " +
+            "     LOWER(e.description) LIKE LOWER(CONCAT('%', :text, '%'))) " +
+            "AND (:categories IS NULL OR SIZE(:categories) = 0 OR e.category.id IN :categories) " +
             "AND (:paid IS NULL OR e.paid = :paid) " +
             "AND e.eventDate >= :rangeStart " +
-            "AND (CAST(:rangeEnd AS timestamp) IS NULL OR e.eventDate <= :rangeEnd)")
-    Page<Event> findPublicEvents(
-            @Param("text") String text,
-            @Param("categories") List<Long> categories,
-            @Param("paid") Boolean paid,
-            @Param("rangeStart") LocalDateTime rangeStart,
-            @Param("rangeEnd") LocalDateTime rangeEnd,
-            Pageable pageable
-    );
+            "AND (:rangeEnd IS NULL OR e.eventDate <= :rangeEnd)")
+    Page<Event> findPublicEvents(@Param("text") String text,
+                                 @Param("categories") List<Long> categories,
+                                 @Param("paid") Boolean paid,
+                                 @Param("rangeStart") LocalDateTime rangeStart,
+                                 @Param("rangeEnd") LocalDateTime rangeEnd,
+                                 Pageable pageable);
 
     Optional<Event> findByIdAndState(Long id, EventState state);
 }

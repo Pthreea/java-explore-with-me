@@ -63,10 +63,13 @@ public class PublicEventServiceImpl implements PublicEventService {
             }
 
             LocalDateTime start = rangeStart != null ? rangeStart : LocalDateTime.now();
+
+            List<Long> categoriesForQuery = (categories != null && categories.isEmpty()) ? null : categories;
+
             Pageable pageable = createPageable(from, size, sort);
 
             List<Event> events = eventRepository.findPublicEvents(
-                    text, categories, paid, start, rangeEnd, pageable
+                    text, categoriesForQuery, paid, start, rangeEnd, pageable
             ).getContent();
 
             if (Boolean.TRUE.equals(onlyAvailable)) {
