@@ -39,7 +39,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
             "    LOWER(e.description) LIKE LOWER(CONCAT('%', CAST(:text AS TEXT), '%'))) " +
             "AND (CAST(:categories AS TEXT) IS NULL OR e.category_id = ANY(CAST(:categories AS BIGINT[]))) " +
             "AND (CAST(:paid AS BOOLEAN) IS NULL OR e.paid = CAST(:paid AS BOOLEAN)) " +
-            "AND e.event_date >= CAST(:rangeStart AS TIMESTAMP) " + 
+            "AND e.event_date >= CAST(:rangeStart AS TIMESTAMP) " +
             "AND (CAST(:rangeEnd AS TIMESTAMP) IS NULL OR e.event_date <= CAST(:rangeEnd AS TIMESTAMP))",
             countQuery = "SELECT COUNT(*) FROM events e WHERE e.state = 'PUBLISHED' " +
                     "AND (CAST(:text AS TEXT) IS NULL OR " +
@@ -48,8 +48,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
                     "AND (CAST(:categories AS TEXT) IS NULL OR e.category_id = ANY(CAST(:categories AS BIGINT[]))) " +
                     "AND (CAST(:paid AS BOOLEAN) IS NULL OR e.paid = CAST(:paid AS BOOLEAN)) " +
                     "AND e.event_date >= CAST(:rangeStart AS TIMESTAMP) " +
-                    "AND (CAST(:rangeEnd AS TIMESTAMP) IS NULL OR e.event_date <= CAST(:rangeEnd AS TIMESTAMP))",
-            nativeQuery = true)
+                    "AND (CAST(:rangeEnd AS TIMESTAMP) IS NULL OR e.event_date <= CAST(:rangeEnd AS TIMESTAMP))", nativeQuery = true)
     Page<Event> searchPublicEvents(@Param("text") String text,
                                    @Param("categories") String categories,
                                    @Param("paid") Boolean paid,
