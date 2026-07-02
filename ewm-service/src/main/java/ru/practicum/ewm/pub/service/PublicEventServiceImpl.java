@@ -62,7 +62,7 @@ public class PublicEventServiceImpl implements PublicEventService {
                 throw new ValidationException("Start date must be before end date");
             }
 
-            LocalDateTime start = rangeStart != null ? rangeStart : LocalDateTime.now();
+            LocalDateTime start = rangeStart != null ? rangeStart : LocalDateTime.of(1970, 1, 1, 0, 0);
 
             Pageable pageable = createPageable(from, size, sort);
 
