@@ -130,10 +130,7 @@ public class PublicEventServiceImpl implements PublicEventService {
     }
 
     private Pageable createPageable(int from, int size, String sort) {
-        if ("EVENT_DATE".equalsIgnoreCase(sort)) {
-            return PageRequest.of(from / size, size, Sort.by("eventDate").ascending());
-        }
-        return PageRequest.of(from / size, size);
+        return PageRequest.of(from / size, size, Sort.unsorted());
     }
 
     private List<Event> filterAvailableEvents(List<Event> events) {
