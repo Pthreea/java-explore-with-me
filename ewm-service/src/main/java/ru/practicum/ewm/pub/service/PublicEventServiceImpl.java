@@ -76,7 +76,7 @@ public class PublicEventServiceImpl implements PublicEventService {
             log.info("Executing query with: text={}, categories={}, paid={}, start={}, end={}",
                     text, cats, paid, start, rangeEnd);
 
-            List<Event> events = eventRepository.findPublicEvents(
+            List<Event> events = eventRepository.searchPublicEvents(
                     text, catsStr, paid, start, rangeEnd, pageable
             ).getContent();
 

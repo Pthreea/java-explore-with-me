@@ -34,27 +34,27 @@ public interface EventRepository extends JpaRepository<Event, Long> {
                                 Pageable pageable);
 
     @Query(value = "SELECT * FROM events e WHERE e.state = 'PUBLISHED' " +
-            "AND (:text IS NULL OR " +
-            "    LOWER(CAST(e.annotation AS TEXT)) LIKE LOWER(CONCAT('%', :text, '%')) OR " +
-            "    LOWER(CAST(e.description AS TEXT)) LIKE LOWER(CONCAT('%', :text, '%'))) " +
-            "AND (:categories IS NULL OR e.category_id = ANY(CAST(:categories AS BIGINT[]))) " +
-            "AND (:paid IS NULL OR e.paid = :paid) " +
-            "AND e.event_date >= :rangeStart " +
-            "AND (:rangeEnd IS NULL OR e.event_date <= :rangeEnd) " +
+            "AND (CAST(:text AS TEXT) IS NULL OR " +
+            "    LOWER(e.annotation) LIKE LOWER(CONCAT('%', CAST(:text AS TEXT), '%')) OR " +
+            "    LOWER(e.description) LIKE LOWER(CONCAT('%', CAST(:text AS TEXT), '%'))) " +
+            "AND (CAST(:categories AS TEXT) IS NULL OR e.category_id = ANY(CAST(:categories AS BIGINT[]))) " +
+            "AND (CAST(:paid AS BOOLEAN) IS NULL OR e.paid = CAST(:paid AS BOOLEAN)) " +
+            "AND e.event_date >= CAST(:rangeStart AS TIMESTAMP) " +
+            "AND (CAST(:rangeEnd AS TIMESTAMP) IS NULL OR e.event_date <= CAST(:rangeEnd AS TIMESTAMP)) " +
             "ORDER BY e.event_date ASC",
             countQuery = "SELECT COUNT(*) FROM events e WHERE e.state = 'PUBLISHED' " +
-                    "AND (:text IS NULL OR " +
-                    "    LOWER(CAST(e.annotation AS TEXT)) LIKE LOWER(CONCAT('%', :text, '%')) OR " +
-                    "    LOWER(CAST(e.description AS TEXT)) LIKE LOWER(CONCAT('%', :text, '%'))) " +
-                    "AND (:categories IS NULL OR e.category_id = ANY(CAST(:categories AS BIGINT[]))) " +
-                    "AND (:paid IS NULL OR e.paid = :paid) " +
-                    "AND e.event_date >= :rangeStart " +
-                    "AND (:rangeEnd IS NULL OR e.event_date <= :rangeEnd)",
+                    "AND (CAST(:text AS TEXT) IS NULL OR " +
+                    "    LOWER(e.annotation) LIKE LOWER(CONCAT('%', CAST(:text AS TEXT), '%')) OR " +
+                    "    LOWER(e.description) LIKE LOWER(CONCAT('%', CAST(:text AS TEXT), '%'))) " +
+                    "AND (CAST(:categories AS TEXT) IS NULL OR e.category_id = ANY(CAST(:categories AS BIGINT[]))) " +
+                    "AND (CAST(:paid AS BOOLEAN) IS NULL OR e.paid = CAST(:paid AS BOOLEAN)) " +
+                    "AND e.event_date >= CAST(:rangeStart AS TIMESTAMP) " +
+                    "AND (CAST(:rangeEnd AS TIMESTAMP) IS NULL OR e.event_date <= CAST(:rangeEnd AS TIMESTAMP))",
             nativeQuery = true)
-    Page<Event> findPublicEvents(@Param("text") String text,
-                                 @Param("categories") String categories,
-                                 @Param("paid") Boolean paid,
-                                 @Param("rangeStart") LocalDateTime rangeStart,
-                                 @Param("rangeEnd") LocalDateTime rangeEnd,
-                                 Pageable pageable);
+    Page<Event> searchPublicEvents(@Param("text") String text,
+                                   @Param("categories") String categories,
+                                   @Param("paid") Boolean paid,
+                                   @Param("rangeStart") LocalDateTime rangeStart,
+                                   @Param("rangeEnd") LocalDateTime rangeEnd,
+                                   Pageable pageable);
 }
