@@ -78,25 +78,7 @@ public class AdminEventServiceImpl implements AdminEventService {
         }
 
         if (request.getStateAction() != null) {
-            AdminStateAction action = AdminStateAction.valueOf(request.getStateAction());
-
-            switch (action) {
-                case PUBLISH_EVENT:
-                    if (event.getState() != EventState.PENDING) {
-                        throw new ConflictException("Cannot publish the event because it's not in the right state: "
-                                + event.getState());
-                    }
-                    event.setState(EventState.PUBLISHED);
-                    event.setPublishedOn(LocalDateTime.now());
-                    break;
-
-                case REJECT_EVENT:
-                    if (event.getState() == EventState.PUBLISHED) {
-                        throw new ConflictException("Cannot reject the event because it's already published");
-                    }
-                    event.setState(EventState.CANCELED);
-                    break;
-            }
+            handleStateAction(event, AdminStateAction.valueOf(request.getStateAction()));
         }
 
         updateEventFields(event, request);
@@ -107,6 +89,33 @@ public class AdminEventServiceImpl implements AdminEventService {
 
         log.info("Event {} updated by admin", eventId);
         return EventMapper.toEventFullDto(updatedEvent, confirmedRequests, 0L);
+    }
+
+    private void handleStateAction(Event event, AdminStateAction action) {
+        switch (action) {
+            case PUBLISH_EVENT:
+                publishEvent(event);
+                break;
+            case REJECT_EVENT:
+                rejectEvent(event);
+                break;
+        }
+    }
+
+    private void publishEvent(Event event) {
+        if (event.getState() != EventState.PENDING) {
+            throw new ConflictException("Cannot publish the event because it's not in the right state: "
+                    + event.getState());
+        }
+        event.setState(EventState.PUBLISHED);
+        event.setPublishedOn(LocalDateTime.now());
+    }
+
+    private void rejectEvent(Event event) {
+        if (event.getState() == EventState.PUBLISHED) {
+            throw new ConflictException("Cannot reject the event because it's already published");
+        }
+        event.setState(EventState.CANCELED);
     }
 
     private void updateEventFields(Event event, UpdateEventAdminRequest request) {

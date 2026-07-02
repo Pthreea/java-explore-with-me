@@ -129,18 +129,42 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
                                                                EventRequestStatusUpdateRequest updateRequest) {
         log.info("User {} updating requests for event {}: {}", userId, eventId, updateRequest);
 
-        Event event = eventRepository.findByIdAndInitiatorId(eventId, userId)
-                .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
+        Event event = validateEventOwnership(userId, eventId);
+        validateParticipantLimit(event);
 
-        Long confirmedCount = requestRepository.countByEventIdAndStatus(eventId, RequestStatus.CONFIRMED);
+        List<ParticipationRequest> requests = getAndValidateRequests(updateRequest.getRequestIds());
+
+        RequestStatus newStatus = RequestStatus.valueOf(updateRequest.getStatus());
+        int availableSlots = calculateAvailableSlots(event);
+
+        EventRequestStatusUpdateResult result = processRequests(requests, newStatus, availableSlots);
+
+        if (availableSlots == 0 && event.getParticipantLimit() > 0) {
+            rejectRemainingPendingRequests(eventId, updateRequest.getRequestIds(), result);
+        }
+
+        log.info("Updated {} requests: {} confirmed, {} rejected",
+                requests.size(), result.getConfirmedRequests().size(), result.getRejectedRequests().size());
+
+        return result;
+    }
+
+    private Event validateEventOwnership(Long userId, Long eventId) {
+        return eventRepository.findByIdAndInitiatorId(eventId, userId)
+                .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
+    }
+
+    private void validateParticipantLimit(Event event) {
+        Long confirmedCount = requestRepository.countByEventIdAndStatus(
+                event.getId(), RequestStatus.CONFIRMED);
 
         if (event.getParticipantLimit() > 0 && confirmedCount >= event.getParticipantLimit()) {
             throw new ConflictException("Participant limit already reached");
         }
+    }
 
-        RequestStatus newStatus = RequestStatus.valueOf(updateRequest.getStatus());
-
-        List<ParticipationRequest> requests = requestRepository.findAllById(updateRequest.getRequestIds());
+    private List<ParticipationRequest> getAndValidateRequests(List<Long> requestIds) {
+        List<ParticipationRequest> requests = requestRepository.findAllById(requestIds);
 
         boolean hasNonPending = requests.stream()
                 .anyMatch(r -> r.getStatus() != RequestStatus.PENDING);
@@ -149,18 +173,33 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
             throw new ConflictException("Can only update requests with status PENDING");
         }
 
+        return requests;
+    }
+
+    private int calculateAvailableSlots(Event event) {
+        if (event.getParticipantLimit() == 0) {
+            return Integer.MAX_VALUE;
+        }
+
+        Long confirmedCount = requestRepository.countByEventIdAndStatus(
+                event.getId(), RequestStatus.CONFIRMED);
+
+        return (int) (event.getParticipantLimit() - confirmedCount);
+    }
+
+    private EventRequestStatusUpdateResult processRequests(List<ParticipationRequest> requests,
+                                                           RequestStatus newStatus,
+                                                           int availableSlots) {
         List<ParticipationRequestDto> confirmed = new ArrayList<>();
         List<ParticipationRequestDto> rejected = new ArrayList<>();
 
-        int availableSlots = event.getParticipantLimit() > 0
-                ? (int) (event.getParticipantLimit() - confirmedCount)
-                : Integer.MAX_VALUE;
+        int slots = availableSlots;
 
         for (ParticipationRequest request : requests) {
-            if (newStatus == RequestStatus.CONFIRMED && availableSlots > 0) {
+            if (newStatus == RequestStatus.CONFIRMED && slots > 0) {
                 request.setStatus(RequestStatus.CONFIRMED);
                 confirmed.add(RequestMapper.toParticipationRequestDto(request));
-                availableSlots--;
+                slots--;
             } else {
                 request.setStatus(RequestStatus.REJECTED);
                 rejected.add(RequestMapper.toParticipationRequestDto(request));
@@ -168,23 +207,22 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
             requestRepository.save(request);
         }
 
-        if (availableSlots == 0 && event.getParticipantLimit() > 0) {
-            List<ParticipationRequest> pendingRequests = requestRepository.findPendingRequestsByEventId(eventId);
-            for (ParticipationRequest pendingRequest : pendingRequests) {
-                if (!updateRequest.getRequestIds().contains(pendingRequest.getId())) {
-                    pendingRequest.setStatus(RequestStatus.REJECTED);
-                    requestRepository.save(pendingRequest);
-                    rejected.add(RequestMapper.toParticipationRequestDto(pendingRequest));
-                }
-            }
-        }
-
-        log.info("Updated {} requests: {} confirmed, {} rejected",
-                requests.size(), confirmed.size(), rejected.size());
-
         return EventRequestStatusUpdateResult.builder()
                 .confirmedRequests(confirmed)
                 .rejectedRequests(rejected)
                 .build();
+    }
+
+    private void rejectRemainingPendingRequests(Long eventId, List<Long> processedIds,
+                                                EventRequestStatusUpdateResult result) {
+        List<ParticipationRequest> pendingRequests = requestRepository.findPendingRequestsByEventId(eventId);
+
+        for (ParticipationRequest pendingRequest : pendingRequests) {
+            if (!processedIds.contains(pendingRequest.getId())) {
+                pendingRequest.setStatus(RequestStatus.REJECTED);
+                requestRepository.save(pendingRequest);
+                result.getRejectedRequests().add(RequestMapper.toParticipationRequestDto(pendingRequest));
+            }
+        }
     }
 }

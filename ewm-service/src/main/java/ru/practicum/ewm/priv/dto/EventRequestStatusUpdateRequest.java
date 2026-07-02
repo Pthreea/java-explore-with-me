@@ -18,5 +18,5 @@ public class EventRequestStatusUpdateRequest {
     private List<Long> requestIds;
 
     @NotNull(message = "Status must not be null")
-    private String status; // CONFIRMED или REJECTED
+    private String status;
 }

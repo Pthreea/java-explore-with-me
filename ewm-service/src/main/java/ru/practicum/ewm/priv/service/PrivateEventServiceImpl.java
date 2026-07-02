@@ -74,11 +74,20 @@ public class PrivateEventServiceImpl implements PrivateEventService {
         Category category = categoryRepository.findById(dto.getCategory())
                 .orElseThrow(() -> new NotFoundException("Category with id=" + dto.getCategory() + " was not found"));
 
-        Event event = EventMapper.toEvent(dto);
-        event.setInitiator(initiator);
-        event.setCategory(category);
-        event.setState(EventState.PENDING);
-        event.setCreatedOn(LocalDateTime.now());
+        Event event = Event.builder()
+                .annotation(dto.getAnnotation())
+                .category(category)
+                .description(dto.getDescription())
+                .eventDate(dto.getEventDate())
+                .initiator(initiator)
+                .location(LocationMapper.toLocation(dto.getLocation()))
+                .paid(dto.getPaid() != null ? dto.getPaid() : false)
+                .participantLimit(dto.getParticipantLimit() != null ? dto.getParticipantLimit() : 0)
+                .requestModeration(dto.getRequestModeration() != null ? dto.getRequestModeration() : true)
+                .state(EventState.PENDING)
+                .title(dto.getTitle())
+                .createdOn(LocalDateTime.now())
+                .build();
 
         Event savedEvent = eventRepository.save(event);
 
@@ -119,17 +128,7 @@ public class PrivateEventServiceImpl implements PrivateEventService {
         }
 
         if (request.getStateAction() != null) {
-            UserStateAction action = UserStateAction.valueOf(request.getStateAction());
-
-            switch (action) {
-                case SEND_TO_REVIEW:
-                    event.setState(EventState.PENDING);
-                    break;
-
-                case CANCEL_REVIEW:
-                    event.setState(EventState.CANCELED);
-                    break;
-            }
+            handleStateAction(event, UserStateAction.valueOf(request.getStateAction()));
         }
 
         updateEventFields(event, request);
@@ -140,6 +139,25 @@ public class PrivateEventServiceImpl implements PrivateEventService {
 
         log.info("Event {} updated", eventId);
         return EventMapper.toEventFullDto(updatedEvent, confirmedRequests, 0L);
+    }
+
+    private void handleStateAction(Event event, UserStateAction action) {
+        switch (action) {
+            case SEND_TO_REVIEW:
+                sendToReview(event);
+                break;
+            case CANCEL_REVIEW:
+                cancelReview(event);
+                break;
+        }
+    }
+
+    private void sendToReview(Event event) {
+        event.setState(EventState.PENDING);
+    }
+
+    private void cancelReview(Event event) {
+        event.setState(EventState.CANCELED);
     }
 
     private void updateEventFields(Event event, UpdateEventUserRequest request) {

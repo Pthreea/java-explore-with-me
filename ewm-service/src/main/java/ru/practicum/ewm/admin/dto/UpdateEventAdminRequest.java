@@ -36,7 +36,7 @@ public class UpdateEventAdminRequest {
 
     private Boolean requestModeration;
 
-    private String stateAction; // PUBLISH_EVENT, REJECT_EVENT
+    private String stateAction;
 
     @Size(min = 3, max = 120, message = "Title must be between 3 and 120 characters")
     private String title;
