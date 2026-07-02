@@ -193,7 +193,7 @@ public class PublicEventServiceImpl implements PublicEventService {
             log.info("Fetching views for event {}: start={}, end={}, uri={}",
                     event.getId(), start, end, uri);
 
-            List<ViewStatsDto> stats = statsClient.getStats(start, end, List.of(uri), false);
+            List<ViewStatsDto> stats = statsClient.getStats(start, end, List.of(uri), true);
 
             Long views = stats.isEmpty() ? 0L : stats.get(0).getHits();
             log.info("Views for event {}: {}", event.getId(), views);
