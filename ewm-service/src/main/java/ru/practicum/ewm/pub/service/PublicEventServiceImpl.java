@@ -63,15 +63,21 @@ public class PublicEventServiceImpl implements PublicEventService {
             }
 
             LocalDateTime start = rangeStart != null ? rangeStart : LocalDateTime.now();
+
             Pageable pageable = createPageable(from, size, sort);
 
-            List<Long> cats = (categories != null && !categories.isEmpty()) ? categories : null;
+            List<Long> cats = (categories == null || categories.isEmpty()) ? null : categories;
+
+
+            String catsStr = (cats == null || cats.isEmpty())
+                    ? null
+                    : "{" + cats.stream().map(String::valueOf).collect(Collectors.joining(",")) + "}";
 
             log.info("Executing query with: text={}, categories={}, paid={}, start={}, end={}",
                     text, cats, paid, start, rangeEnd);
 
             List<Event> events = eventRepository.findPublicEvents(
-                    text, cats, paid, start, rangeEnd, pageable
+                    text, catsStr, paid, start, rangeEnd, pageable
             ).getContent();
 
             log.info("Found {} events", events.size());
@@ -94,6 +100,8 @@ public class PublicEventServiceImpl implements PublicEventService {
             if ("VIEWS".equalsIgnoreCase(sort)) {
                 result.sort(Comparator.comparing(EventShortDto::getViews).reversed());
             }
+
+            log.info("Returning {} events", result.size()); // ✅ Добавьте
 
             return result;
 
@@ -173,6 +181,30 @@ public class PublicEventServiceImpl implements PublicEventService {
         return request.getRemoteAddr();
     }
 
+    private Long getViews(Event event) {
+        try {
+            LocalDateTime start = event.getPublishedOn() != null
+                    ? event.getPublishedOn()
+                    : event.getCreatedOn();
+
+            LocalDateTime end = LocalDateTime.now();
+            String uri = "/events/" + event.getId();
+
+            log.info("Fetching views for event {}: start={}, end={}, uri={}",
+                    event.getId(), start, end, uri);
+
+            List<ViewStatsDto> stats = statsClient.getStats(start, end, List.of(uri), false);
+
+            Long views = stats.isEmpty() ? 0L : stats.get(0).getHits();
+            log.info("Views for event {}: {}", event.getId(), views);
+
+            return views;
+        } catch (Exception e) {
+            log.error("Failed to get views for event {}: {}", event.getId(), e.getMessage());
+            return 0L;
+        }
+    }
+
     private Map<Long, Long> getViewsMap(List<Event> events) {
         if (events.isEmpty()) {
             return Collections.emptyMap();
@@ -188,7 +220,7 @@ public class PublicEventServiceImpl implements PublicEventService {
                 .collect(Collectors.toList());
 
         try {
-            List<ViewStatsDto> stats = statsClient.getStats(start, LocalDateTime.now(), uris, true); // unique=true
+            List<ViewStatsDto> stats = statsClient.getStats(start, LocalDateTime.now(), uris, false);
 
             return stats.stream()
                     .collect(Collectors.toMap(
@@ -198,30 +230,6 @@ public class PublicEventServiceImpl implements PublicEventService {
         } catch (Exception e) {
             log.error("Failed to get views map: {}", e.getMessage());
             return Collections.emptyMap();
-        }
-    }
-
-    private Long getViews(Event event) {
-        try {
-            LocalDateTime start = event.getPublishedOn() != null
-                    ? event.getPublishedOn()
-                    : event.getCreatedOn();
-
-            LocalDateTime end = LocalDateTime.now();
-            String uri = "/events/" + event.getId();
-
-            log.info("Fetching views for event {}: start={}, end={}, uri={}",
-                    event.getId(), start, end, uri);
-
-            List<ViewStatsDto> stats = statsClient.getStats(start, end, List.of(uri), true); // unique=true
-
-            Long views = stats.isEmpty() ? 0L : stats.get(0).getHits();
-            log.info("Views for event {}: {}", event.getId(), views);
-
-            return views;
-        } catch (Exception e) {
-            log.error("Failed to get views for event {}: {}", event.getId(), e.getMessage());
-            return 0L;
         }
     }
 
