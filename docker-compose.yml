@@ -10,10 +10,12 @@ services:
       - "6541:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d stats"]
-      interval: 3s
-      timeout: 2s
+      interval: 5s
+      timeout: 3s
       retries: 10
       start_period: 5s
+    volumes:
+      - stats_data:/var/lib/postgresql/data
 
   stats-server:
     build:
@@ -26,15 +28,18 @@ services:
       stats-db:
         condition: service_healthy
     environment:
+      SERVER_PORT: 9090
       SPRING_DATASOURCE_URL: jdbc:postgresql://stats-db:5432/stats
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
       SPRING_JPA_DDL_AUTO: update
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info
+      MANAGEMENT_SERVER_PORT: 9090
     restart: on-failure:3
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9090/actuator/health"]
-      interval: 5s
-      timeout: 3s
+      interval: 10s
+      timeout: 5s
       retries: 20
       start_period: 40s
 
@@ -49,10 +54,12 @@ services:
       - "6542:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d ewm"]
-      interval: 3s
-      timeout: 2s
+      interval: 5s
+      timeout: 3s
       retries: 10
       start_period: 5s
+    volumes:
+      - ewm_data:/var/lib/postgresql/data
 
   ewm-service:
     build:
@@ -75,7 +82,11 @@ services:
     restart: on-failure:3
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      interval: 5s
-      timeout: 3s
+      interval: 10s
+      timeout: 5s
       retries: 20
       start_period: 40s
+
+volumes:
+  stats_data:
+  ewm_data:
