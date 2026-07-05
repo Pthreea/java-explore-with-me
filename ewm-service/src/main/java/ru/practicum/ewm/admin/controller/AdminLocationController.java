@@ -23,13 +23,15 @@ public class AdminLocationController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public LocationDto createLocation(@Valid @RequestBody NewLocationDto dto) {
+    public LocationDto createLocation(
+            @RequestBody @Validated(NewLocationDto.Create.class) NewLocationDto dto) {
         return locationService.createLocation(dto);
     }
 
     @PatchMapping("/{locationId}")
-    public LocationDto updateLocation(@PathVariable Long locationId,
-                                      @Valid @RequestBody NewLocationDto dto) {
+    public LocationDto updateLocation(
+            @PathVariable Long locationId,
+            @RequestBody @Valid NewLocationDto dto) {
         return locationService.updateLocation(locationId, dto);
     }
 

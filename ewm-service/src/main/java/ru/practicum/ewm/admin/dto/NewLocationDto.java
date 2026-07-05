@@ -14,14 +14,15 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class NewLocationDto {
-    @NotBlank
+
+    @NotBlank(groups = Create.class)
     @Size(min = 3, max = 255)
     private String name;
 
-    @NotNull
+    @NotNull(groups = Create.class)
     private Float lat;
 
-    @NotNull
+    @NotNull(groups = Create.class)
     private Float lon;
 
     @Size(max = 1000)
@@ -29,4 +30,7 @@ public class NewLocationDto {
 
     @Positive
     private Float radius;
+
+    public interface Create {
+    }
 }
