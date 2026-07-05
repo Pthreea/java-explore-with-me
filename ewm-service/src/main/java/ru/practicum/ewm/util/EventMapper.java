@@ -17,7 +17,7 @@ public class EventMapper {
                 .description(event.getDescription())
                 .eventDate(event.getEventDate())
                 .initiator(UserMapper.toUserShortDto(event.getInitiator()))
-                .location(LocationMapper.toLocationDto(event.getLocation()))
+                .location(LocationMapper.toLocationDto(event.getLocation())) // ✅ Уже правильно
                 .paid(event.getPaid())
                 .participantLimit(event.getParticipantLimit())
                 .publishedOn(event.getPublishedOn())
@@ -47,7 +47,7 @@ public class EventMapper {
                 .annotation(dto.getAnnotation())
                 .description(dto.getDescription())
                 .eventDate(dto.getEventDate())
-                .location(LocationMapper.toLocation(dto.getLocation()))
+                .location(LocationMapper.toEventLocation(dto.getLocation()))
                 .paid(dto.getPaid())
                 .participantLimit(dto.getParticipantLimit())
                 .requestModeration(dto.getRequestModeration())
