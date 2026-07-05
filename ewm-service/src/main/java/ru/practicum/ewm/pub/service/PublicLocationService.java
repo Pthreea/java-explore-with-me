@@ -6,5 +6,6 @@ import java.util.List;
 
 public interface PublicLocationService {
     List<LocationDto> searchLocations(String text, int from, int size);
+
     LocationDto getLocationById(Long locationId);
 }
