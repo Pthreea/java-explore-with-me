@@ -134,7 +134,8 @@ public class AdminEventServiceImpl implements AdminEventService {
             event.setEventDate(request.getEventDate());
         }
         if (request.getLocation() != null) {
-            event.setLocation(LocationMapper.toLocation(request.getLocation()));
+            // ✅ ИЗМЕНЕНО: toEventLocation вместо toLocation
+            event.setLocation(LocationMapper.toEventLocation(request.getLocation()));
         }
         if (request.getPaid() != null) {
             event.setPaid(request.getPaid());

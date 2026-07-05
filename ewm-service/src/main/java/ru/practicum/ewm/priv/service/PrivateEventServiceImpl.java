@@ -80,13 +80,11 @@ public class PrivateEventServiceImpl implements PrivateEventService {
                 .description(dto.getDescription())
                 .eventDate(dto.getEventDate())
                 .initiator(initiator)
-                .location(LocationMapper.toLocation(dto.getLocation()))
+                .location(LocationMapper.toEventLocation(dto.getLocation()))
                 .paid(dto.getPaid() != null ? dto.getPaid() : false)
                 .participantLimit(dto.getParticipantLimit() != null ? dto.getParticipantLimit() : 0)
                 .requestModeration(dto.getRequestModeration() != null ? dto.getRequestModeration() : true)
-                .state(EventState.PENDING)
                 .title(dto.getTitle())
-                .createdOn(LocalDateTime.now())
                 .build();
 
         Event savedEvent = eventRepository.save(event);
@@ -176,7 +174,7 @@ public class PrivateEventServiceImpl implements PrivateEventService {
             event.setEventDate(request.getEventDate());
         }
         if (request.getLocation() != null) {
-            event.setLocation(LocationMapper.toLocation(request.getLocation()));
+            event.setLocation(LocationMapper.toEventLocation(request.getLocation()));
         }
         if (request.getPaid() != null) {
             event.setPaid(request.getPaid());
